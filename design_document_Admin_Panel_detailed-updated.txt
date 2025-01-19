@@ -1,0 +1,493 @@
+### Technical Design Specification Document for "Admin Panel"
+
+#### 1. Overview
+
+The "Admin Panel" is a web-based interface for managing the e-commerce platform. It provides functionalities to manage products, customers, orders, logistics partners, and sales reports. The admin panel is built using Node.js, Express, Sequelize, and PostgreSQL.
+
+#### 2. Environment Configuration
+
+**File:** 
+
+.env
+
+
+```plaintext
+
+
+# Database Configuration
+
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=admin
+DB_PASSWORD=admin123
+DB_NAME=ecommerce_db
+
+# Application Configuration
+PORT=3000
+API_BASE_URL=/api/v1
+API_RATE_LIMIT=100
+API_RATE_LIMIT_WINDOW=15
+LOG_FORMAT=combined
+
+# Security Configuration
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRES_IN=1h
+COOKIE_EXPIRES_IN=1
+
+# Admin Panel Configuration
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+```
+
+#### 3. Database Schema
+
+**Database Tables:**
+- `customers`
+- `products`
+- `orders`
+- `order_items`
+- `sales_reports`
+- `logistics_partners`
+- `blog_authors`
+- `blog_categories`
+- `blog_comments`
+- `blog_posts`
+- `subscription_history`
+
+**Example Table Structure:**
+```sql
+CREATE TABLE customers (
+    customer_id SERIAL PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    email VARCHAR NOT NULL UNIQUE,
+    phone VARCHAR,
+    address JSONB,
+    registration_date TIMESTAMP DEFAULT NOW(),
+    newsletter_opt_in BOOLEAN DEFAULT FALSE,
+    subscription_status VARCHAR DEFAULT 'unsubscribed'
+);
+```
+
+#### 4. Project Structure
+
+```plaintext
+.
+├── admin
+│   ├── assets
+│   │   ├── css
+│   │   └── js
+│   ├── customers
+│   │   └── index.html
+│   ├── dashboard
+│   │   └── index.html
+│   ├── logistics
+│   │   └── index.html
+│   ├── logistics_partners
+│   │   └── index.html
+│   ├── orders
+│   │   └── index.html
+│   ├── products
+│   │   └── index.html
+│   ├── reports
+│   │   └── index.html
+│   └── sales_reports
+│       └── index.html
+├── api
+│   ├── controllers
+│   │   ├── customers.js
+│   │   ├── dashboard.js
+│   │   ├── logistics.js
+│   │   ├── orders.js
+│   │   ├── products.js
+│   │   └── reports.js
+│   ├── errors
+│   │   └── index.js
+│   ├── middleware
+│   │   └── validation.js
+│   ├── models
+│   │   ├── customer.js
+│   │   ├── dashboard.js
+│   │   ├── logistics.js
+│   │   ├── order.js
+│   │   ├── orderItem.js
+│   │   ├── product.js
+│   │   └── salesReport.js
+│   ├── routes
+│   │   ├── customers.js
+│   │   ├── dashboard.js
+│   │   ├── index.js
+│   │   ├── logistics.js
+│   │   ├── orders.js
+│   │   ├── products.js
+│   │   └── reports.js
+│   └── validators
+│       └── productSchema.js
+├── .env
+├── .eslintrc.json
+├── app.js
+└── package.json
+```
+
+#### 5. Key Components
+
+##### 5.1 Dashboard
+
+**File:** 
+
+index.html
+
+
+```html
+<div class="dashboard">
+  <div class="metrics">
+    <div class="card">
+      <h3>Total Products</h3>
+      <p id="total-products">...</p>
+    </div>
+    <div class="card">
+      <h3>Total Customers</h3>
+      <p id="total-customers">...</p>
+    </div>
+    <div class="card">
+      <h3>Total Orders</h3>
+      <p id="total-orders">...</p>
+    </div>
+    <div class="card">
+      <h3>Total Sales</h3>
+      <p id="total-sales">...</p>
+    </div>
+  </div>
+  <div class="recent-orders">
+    <table id="recent-orders">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Customer Name</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Recent orders will be populated here -->
+      </tbody>
+    </table>
+  </div>
+  <div class="shortcuts">
+    <button onclick="location.href='/admin/products/add'">Add Product</button>
+    <button onclick="location.href='/admin/orders'">View Orders</button>
+    <button onclick="location.href='/admin/reports/generate'">Generate Reports</button>
+  </div>
+</div>
+```
+
+##### 5.2 Products
+
+**File:** 
+
+index.html
+
+
+```html
+<div class="products">
+  <div class="search-filter">
+    <input type="text" id="search-name" placeholder="Search by name">
+    <select id="filter-category">
+      <option value="">All Categories</option>
+      <!-- Categories will be populated here -->
+    </select>
+    <select id="filter-stock">
+      <option value="">All Stock Status</option>
+      <option value="in-stock">In Stock</option>
+      <option value="out-of-stock">Out of Stock</option>
+    </select>
+  </div>
+  <table id="product-list">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Price</th>
+        <th>Stock</th>
+        <th>Creation Date</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Product rows will be populated here -->
+    </tbody>
+  </table>
+  <button id="add-product-btn">Add Product</button>
+  <div id="product-modal" class="modal">
+    <form id="product-form">
+      <!-- Form fields for product details -->
+    </form>
+  </div>
+</div>
+```
+
+##### 5.3 Customers
+
+**File:** 
+
+index.html
+
+
+```html
+<div class="customers">
+  <div class="search-filter">
+    <input type="text" id="search-name" placeholder="Search by name">
+    <input type="text" id="search-email" placeholder="Search by email">
+    <select id="filter-subscription">
+      <option value="">All Subscription Status</option>
+      <option value="subscribed">Subscribed</option>
+      <option value="unsubscribed">Unsubscribed</option>
+    </select>
+  </div>
+  <table id="customer-list">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Address</th>
+        <th>Registration Date</th>
+        <th>Newsletter Subscription</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Customer rows will be populated here -->
+    </tbody>
+  </table>
+  <div id="customer-profile">
+    <!-- Customer details and order history will be displayed here -->
+  </div>
+</div>
+```
+
+##### 5.4 Logistics Partners
+
+**File:** 
+
+index.html
+
+
+```html
+<div class="logistics-partners">
+  <table id="partner-list">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Region</th>
+        <th>Contact Details</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Partner rows will be populated here -->
+    </tbody>
+  </table>
+  <button id="add-partner-btn">Add Partner</button>
+  <div id="partner-modal" class="modal">
+    <form id="partner-form">
+      <!-- Form fields for partner details -->
+    </form>
+  </div>
+</div>
+```
+
+##### 5.5 Orders
+
+**File:** 
+
+index.html
+
+
+```html
+<div class="orders">
+  <div class="search-filter">
+    <input type="text" id="search-customer" placeholder="Search by customer name">
+    <select id="filter-status">
+      <option value="">All Statuses</option>
+      <!-- Status options will be populated here -->
+    </select>
+    <input type="date" id="filter-date-start">
+    <input type="date" id="filter-date-end">
+  </div>
+  <table id="order-list">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Customer Name</th>
+        <th>Status</th>
+        <th>Total Amount</th>
+        <th>Date</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Order rows will be populated here -->
+    </tbody>
+  </table>
+  <div id="order-details">
+    <!-- Order details will be displayed here -->
+  </div>
+  <select id="update-status">
+    <!-- Status options will be populated here -->
+  </select>
+</div>
+```
+
+##### 5.6 Sales Reports
+
+**File:** 
+
+index.html
+
+
+```html
+<div class="sales-reports">
+  <form id="generate-report-form">
+    <input type="date" id="start-date">
+    <input type="date" id="end-date">
+    <button type="submit">Generate Report</button>
+  </form>
+  <table id="report-list">
+    <thead>
+      <tr>
+        <th>Date Range</th>
+        <th>Total Sales</th>
+        <th>Order Count</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Report rows will be populated here -->
+    </tbody>
+  </table>
+  <div id="sales-charts">
+    <!-- Charts will be displayed here -->
+  </div>
+</div>
+```
+
+#### 6. API Endpoints
+
+##### 6.1 Customers
+
+**File:** 
+
+customers.js
+
+
+```js
+export const getCustomers = async (req, res) => {
+  try {
+    const customers = await Customer.findAll();
+    res.json(customers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+```
+
+##### 6.2 Products
+
+**File:** 
+
+products.js
+
+
+```js
+export const getProducts = async (req, res) => {
+  try {
+    const { search, category, minPrice, maxPrice, inStock } = req.query;
+    const where = {};
+    if (search) where.name = { [Op.iLike]: `%${search}%` };
+    if (category) where.category = category;
+    if (minPrice || maxPrice) {
+      where.price = {};
+      if (minPrice) where.price[Op.gte] = minPrice;
+      if (maxPrice) where.price[Op.lte] = maxPrice;
+    }
+    if (inStock === 'true') where.stock_quantity = { [Op.gt]: 0 };
+    const products = await Product.findAll({ where, order: [['created_at', 'DESC']] });
+    res.json({ success: true, data: products });
+  } catch (error) {
+    throw new InternalServerError('Failed to fetch products');
+  }
+};
+```
+
+##### 6.3 Orders
+
+**File:** 
+
+orders.js
+
+
+```js
+export const getOrders = async (req, res) => {
+  try {
+    const orders = await Order.findAll({
+      include: [
+        { model: Customer, attributes: ['name'] },
+        { model: OrderItem, include: [Product] }
+      ]
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+```
+
+#### 7. Future Enhancements
+
+To enhance the project with modern technologies, consider the following:
+
+1. **Next.js with TypeScript:**
+   - Migrate the project to Next.js for server-side rendering and better performance.
+   - Use TypeScript for type safety and better code maintainability.
+
+2. **Tailwind CSS:**
+   - Integrate Tailwind CSS for utility-first CSS framework to build custom designs quickly.
+
+3. **Next-UI and Shadcn-UI:**
+   - Use Next-UI and Shadcn-UI for pre-built UI components to speed up development.
+
+4. **Prisma for Supabase:**
+   - Use Prisma as an ORM with Supabase for a scalable and easy-to-use database solution.
+
+5. **NextAuth.js:**
+   - Integrate NextAuth.js for authentication and authorization, providing secure and flexible authentication solutions.
+
+**Example Enhancement:**
+```bash
+# Install Next.js, TypeScript, and Tailwind CSS
+npx create-next-app@latest my-ecommerce-admin --typescript
+cd my-ecommerce-admin
+npm install tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+
+# Configure Tailwind CSS
+# tailwind.config.js
+module.exports = {
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+
+# Install Next-UI, Shadcn-UI, Prisma, and NextAuth.js
+npm install @nextui-org/react @shadcn/ui @prisma/client next-auth
+```
+
+By following these steps, the project can be modernized and enhanced with the latest technologies, improving performance, maintainability, and user experience.
+
+Similar code found with 1 license type
